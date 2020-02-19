@@ -1,1 +1,1 @@
-cl main.cpp
+cl %cd%/source/main.cpp
