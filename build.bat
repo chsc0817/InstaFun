@@ -1,1 +1,2 @@
-cl %cd%/source/main.cpp
+
+cl %cd%/source/main.cpp /nologo /Zi /Od
