@@ -12,8 +12,8 @@ struct bmp_header
 struct bmp_dip_header
 {
     u32 dip_header_byte_count;
-    u16 width, height;
-    u16 color_plane_count; // must be 1
+    u32 width, height;
+    u32 color_plane_count; // must be 1
     u16 bits_per_pixel;
     
     u32 compression_method;
@@ -76,8 +76,8 @@ LoadBMP(u8_array source)
     Advance(&it, dip_header->dip_header_byte_count - sizeof(bmp_dip_header));
     
     texture result;
-    result.width = ?;
-    result.height = ?;
+    result.width = dip_header->width;
+    result.height = dip_header->height;
     
     result.data = it;
     
