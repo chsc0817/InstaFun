@@ -1,4 +1,8 @@
+#ifndef BMP_H 
+#define BMP_H
 
+#include "basic.h"
+#include "render.h"
 // #pragma pack(push, 1) sets data alignment to 1, removes padding from structs
 #pragma pack(push, 1)
 struct bmp_header
@@ -41,45 +45,23 @@ struct bmp_dip_header
 
 #pragma pack(pop)
 
-#if 0
-enum
-{
-    BI_RGB = 0,
+
+enum {
+    BMP_NO_COMPRESSION = 0,
 };
-#endif
+
 
 #define NextItem(iterator, type) ((type *)Advance(iterator, sizeof(type)).base)
 #define PeekItem(iterator, type) ((type *)(iterator).base)
 
-struct texture
+struct image
 {
     u8_array data;
     u32 width, height;
 };
 
-texture
-LoadBMP(u8_array source)
-{
-    auto it = source;
-    
-    auto header = NextItem(&it, bmp_header);
-    
-    auto dip_header_byte_count = *PeekItem(it, u32);
-    
-    assert(dip_header_byte_count == 124);
-    
-    auto dip_header = NextItem(&it, bmp_dip_header);
-    
-    // no compression
-    assert(dip_header->compression_method == BI_RGB);
-    
-    Advance(&it, dip_header->dip_header_byte_count - sizeof(bmp_dip_header));
-    
-    texture result;
-    result.width = dip_header->width;
-    result.height = dip_header->height;
-    
-    result.data = it;
-    
-    return result;
-}
+image LoadBMP(u8_array source);
+
+texture LoadBMPTexture(cstring file_path);
+
+#endif

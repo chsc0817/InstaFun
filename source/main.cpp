@@ -1,6 +1,10 @@
+#include <stdio.h>
+#include <windows.h>
+#include <gl/gl.h>
 
-#include "win32_instafun.h"
-#include "bmp.h"
+#include "win32_instafun.cpp"
+#include "bmp.cpp"
+#include "render.cpp"
 
 s32 global_width = 500;
 s32 global_height = 300;
@@ -75,11 +79,8 @@ void main() {
     
 	ShowWindow(window_handle, SW_SHOW);
 	
-    auto result = ReadEntireFile("data/sprites.bmp");
-    assert(result.ok);
-    
-    auto data = result.data;
-    LoadBMP(data);
+  auto sprites = LoadBMPTexture("data/sprites.bmp");
+  auto background = LoadBMPTexture("data/stage.bmp");
     
 	bool do_continue = true;
     
@@ -101,11 +102,55 @@ void main() {
     	glViewport(0, 0, global_width, global_height);
     	glClearColor(0, 0.5f, 0.5f, 1.0f);
     	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      
+      glEnable(GL_TEXTURE_2D);
+      glEnable(GL_ALPHA_TEST);
+      glAlphaFunc(GL_GEQUAL, 1/255.0f);
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+      glBindTexture(GL_TEXTURE_2D, background.id);
+
+      glBegin(GL_TRIANGLES);
+        glTexCoord2f(0.01f, 0);
+        glVertex2f(-1, -1);
+
+        glTexCoord2f(1, 0);
+        glVertex2f(1, -1);
         
+        glTexCoord2f(1, 1);
+        glVertex2f(1, 1);
+
+        glTexCoord2f(0.01f, 1);
+        glVertex2f(-1, 1);
+
+        glTexCoord2f(0.01f, 0);
+        glVertex2f(-1, -1);
+
+        glTexCoord2f(1, 1);
+        glVertex2f(1, 1);
+      glEnd();
+
+      glBindTexture(GL_TEXTURE_2D, sprites.id);
+
     	glBegin(GL_TRIANGLES);
-    	glVertex2f(-1, -1);
-    	glVertex2f(1, -1);
-    	glVertex2f(0, 1);
+        glTexCoord2f(0, 0);
+      	glVertex2f(-0.5f, -0.5f);
+
+        glTexCoord2f(1, 0);
+      	glVertex2f(0.5f, -0.5f);
+      	
+        glTexCoord2f(1, 1);
+        glVertex2f(0.5f, 0.5f);
+
+        glTexCoord2f(0, 1);
+        glVertex2f(-0.5f, 0.5f);
+
+        glTexCoord2f(0, 0);
+        glVertex2f(-0.5f, -0.5f);
+
+        glTexCoord2f(1, 1);
+        glVertex2f(0.5f, 0.5f);
     	glEnd();
         
     	SwapBuffers(device_context);
