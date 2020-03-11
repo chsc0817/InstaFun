@@ -1,7 +1,10 @@
 *.exe
 *.obj
-*ilk
+*.ilk
 *.pdb
 *.sln
+*.dll
+*.exp
+*.lib
 
 .vs/
