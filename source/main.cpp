@@ -1,68 +1,90 @@
 #include "win32_instafun.cpp"
 
-const cstring INSTAFUN_DLL_SOURCE = "instafun.dll";
-const cstring INSTAFUN_DLL_COPY = "instafun_copy.dll";
-
-bool CopyDll() {
-  if (!CopyFile(INSTAFUN_DLL_SOURCE, INSTAFUN_DLL_COPY, false)) {
-    printf("Could not copy %s. Error Code: %u", INSTAFUN_DLL_SOURCE, GetLastError());
-    return false;
-  }
-  return true;
+u64 GetLastWriteTime(cstring file) {
+    WIN32_FILE_ATTRIBUTE_DATA attributes;
+    if (GetFileAttributesExA(file, GetFileExInfoStandard, &attributes)){
+        return (((u64) attributes.ftLastWriteTime.dwHighDateTime) << 32) | (attributes.ftLastWriteTime.dwLowDateTime);
+    }
+    return 0;
 }
 
-u64 getLastWriteTime(cstring file) {
-  WIN32_FILE_ATTRIBUTE_DATA attributes;
-  if (GetFileAttributesExA(file, GetFileExInfoStandard, &attributes)){
-    return (((u64) attributes.ftLastWriteTime.dwHighDateTime) << 32) | (attributes.ftLastWriteTime.dwLowDateTime);
-  }
-  return 0;
+#if defined LIVE_CODE_RELOADING
+
+bool LoadCode(code_info *code) {
+    bool do_reload = false;
+    
+    u64 last_write_time = GetLastWriteTime("build/instafun.dll");
+    if(last_write_time > code->last_write_time) {
+        
+        WIN32_FILE_ATTRIBUTE_DATA attributes;
+        if (GetFileAttributesExA("build/compile.lock", GetFileExInfoStandard, &attributes))
+            return false;
+        
+        do_reload = true;
+        
+        if (code->dll_handle)
+            FreeLibrary(code->dll_handle);
+        
+        code->dll_handle = LoadLibraryA("instafun.dll");
+        assert(code->dll_handle);
+        code->init   =   (init_function)GetProcAddress(code->dll_handle, "Init");
+        code->update = (update_function)GetProcAddress(code->dll_handle, "Update");
+        
+        if (!code->init || !code->update)
+            do_reload = false;
+        
+        FreeLibrary(code->dll_handle);
+        
+        if (do_reload)
+        {
+            bool ok = CopyFile("build/instafun.dll", "build/instafun_live.dll", false);
+            assert(ok);
+        }
+        
+        code->dll_handle = LoadLibraryA("instafun_live.dll");
+        assert(code->dll_handle);
+        
+        code->init   =   (init_function)GetProcAddress(code->dll_handle, "Init");
+        code->update = (update_function)GetProcAddress(code->dll_handle, "Update");
+        code->last_write_time = last_write_time;
+    }
+    
+    return do_reload;
 }
 
-//will not change parameters if LoadLibraryA fails
-void LoadLib(HMODULE *dll_handle, init_function *init, update_function *update){
-  HMODULE new_handle = LoadLibraryA(INSTAFUN_DLL_COPY);
-  
-  if (!new_handle) {
-    printf("Could not load library. Error Code: %u", GetLastError());
-    return;
-  }
-
-  *dll_handle = new_handle;
-  *init = (init_function) GetProcAddress(new_handle, "Init");
-  *update = (update_function) GetProcAddress(new_handle, "Update");
+void InitCode(code_info *code)
+{
+    bool ok = LoadCode(code);
+    assert(ok);
 }
+
+#else
+
+#include "instafun.cpp"
+
+#define LoadCode(...) 
+
+void InitCode(code_info *code)
+{
+    code->init = Init;
+    code->update = Update;
+}
+
+#endif
 
 void main() {
-  win32_api api;
-  Win32Init(&api); 
-
-  if(!CopyDll()) {
-    return;
-  }
-
-  HMODULE dll_handle = {};
-  init_function init = {};
-  update_function update = {};
-  LoadLib(&dll_handle, &init, &update);  
-  
-  auto init_data = init(&api);
-  u64 last_write_time = getLastWriteTime(INSTAFUN_DLL_SOURCE);  
-
-  while(Win32HandleMessage(&api)) {      
-
-    if(getLastWriteTime(INSTAFUN_DLL_SOURCE) > last_write_time) {
-      if (FreeLibrary(dll_handle)){
-        CopyDll();
-        LoadLib(&dll_handle, &init, &update);
-        last_write_time = getLastWriteTime(INSTAFUN_DLL_SOURCE);
-      } else {          
-        printf("Could not free library. Error Code: %u", GetLastError());
-      }
-    }    
-
-    update(&api, init_data);
-  }   
+    win32_api api;
+    Win32Init(&api); 
+    
+    InitCode(&api.application);
+    
+    api.application.init_data = api.application.init(&api);
+    
+    while(Win32HandleMessage(&api)) {
+        LoadCode(&api.application);
+        
+        api.application.update(&api, api.application.init_data);
+    }   
     
 	printf(":D\n");
 }

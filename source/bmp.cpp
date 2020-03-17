@@ -1,5 +1,4 @@
 #include "bmp.h"
-#include "win32_instafun.h"
 
 image LoadBMP(u8_array source)
 {
@@ -28,20 +27,13 @@ image LoadBMP(u8_array source)
     for(u32 i = 0; i < result.width * result.height; i++) {
         Swap(result.data[i * 4], result.data[i * 4 + 2]); 
     }
-
+    
     return result;
 }
 
-texture LoadBMPTexture(cstring file_path) {
-    auto result = ReadEntireFile(file_path);
-    assert(result.ok);
-    
-    auto data = result.data;
-    auto image = LoadBMP(data);
+texture LoadBMPTexture(u8_array source) {
+    auto image = LoadBMP(source);
     auto texture = MakeTexture(image.width, image.height, image.data);
     
-    delete [] data.base;
-
     return texture;
-
 }
