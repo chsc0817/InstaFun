@@ -36,27 +36,7 @@ extern "C" __declspec(dllexport) UPDATE_SIGNATURE(Update){
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    glBindTexture(GL_TEXTURE_2D, state->background.id);
-
-    glBegin(GL_TRIANGLES);
-      glTexCoord2f(0.01f, 0);
-      glVertex2f(-1, -1);
-
-      glTexCoord2f(1, 0);
-      glVertex2f(1, -1);
-      
-      glTexCoord2f(1, 1);
-      glVertex2f(1, 1);
-
-      glTexCoord2f(0.01f, 1);
-      glVertex2f(-1, 1);
-
-      glTexCoord2f(0.01f, 0);
-      glVertex2f(-1, -1);
-
-      glTexCoord2f(1, 1);
-      glVertex2f(1, 1);
-    glEnd();
+    
 
     glBindTexture(GL_TEXTURE_2D, state->sprites.id);
 
