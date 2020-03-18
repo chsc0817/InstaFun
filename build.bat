@@ -1,10 +1,16 @@
 @echo off
+setlocal EnableDelayedExpansion
 
 set name=instafun
 
-rem set live_code_reloading=true
-set live_code_reloading=false
+set live_code_reloading=true
+rem set live_code_reloading=false
 
+rem nologo: disable visual studio copyright info
+rem Zi: generate debug information
+rem Od: optimize for debugging
+rem Mtd: use multithreaded runtime debug dll (visual studio redistributables)
+rem EHsc: use minimal exception handling?
 set options=/nologo /Zi /Od /MTd /EHsc
 
 set t=%time:~0,8%
@@ -15,16 +21,20 @@ set current=%cd%
 if not exist build\ mkdir build
 pushd build
 
-del *.pdb > NUL
+del *.pdb > NUL 2> NUL  
+del instafun_live.dll > NUL 2> NUL
 
 if %live_code_reloading% == true (
 	set options=%options% /DLIVE_CODE_RELOADING
-
+	rem while compile lock exists our application does not try to reload the new dll
 	echo compiling... > compile.lock
-	cl %current%/source/instafun.cpp %options% /LD /INCREMENTAL:NO /link /PDB:"instafun%date%-%t%.pdb" 
+	rem !options! uses changes to options immediately, otherwise %options% is only updated after if statement  
+	cl %current%/source/instafun.cpp !options! /LD /INCREMENTAL:NO /link /PDB:"instafun%date%-%t%.pdb" 
 	del compile.lock
 )
 
-cl /Fe%name% %current%/source/main.cpp %options% /link /INCREMENTAL:NO
+if not exist instafun_live.dll (
+	cl /Fe%name% %current%/source/main.cpp %options% /link /INCREMENTAL:NO	
+)
 
 popd

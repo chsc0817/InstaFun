@@ -15,6 +15,8 @@
 #define u32 uint32_t
 #define u64 uint64_t
 
+#define f32 float
+
 // maximal addressable size (32bit or 64bit), unsigned memory (umm)
 #define umm size_t 
 

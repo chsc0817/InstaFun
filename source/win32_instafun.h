@@ -16,6 +16,14 @@ struct win32_window;
 typedef INIT_SIGNATURE((*init_function));
 typedef UPDATE_SIGNATURE((*update_function));
 
+#ifdef LIVE_CODE_RELOADING
+#define INIT_DECLARATION extern "C" __declspec(dllexport) INIT_SIGNATURE(Init)
+#define UPDATE_DECLARATION extern "C" __declspec(dllexport) UPDATE_SIGNATURE(Update)
+#else 
+#define INIT_DECLARATION INIT_SIGNATURE(Init)
+#define UPDATE_DECLARATION UPDATE_SIGNATURE(Update)
+#endif
+
 
 #define CREATE_WINDOW_SIGNATURE(name) void name(win32_window *window, win32_api *api, s32 width, s32 height, cstring title)
 typedef CREATE_WINDOW_SIGNATURE((*create_window_function));

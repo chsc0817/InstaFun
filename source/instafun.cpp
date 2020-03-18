@@ -6,6 +6,8 @@
 #include "render.cpp"
 #include "win32_instafun.h"
 
+const f32 target_width_over_height = 16.0f/9.0f;
+
 struct State {
 	win32_window window;
 	texture sprites;
@@ -22,10 +24,10 @@ texture LoadBMPTextureFromFile(win32_api *api, cstring file_path)
     return my_texture;
 }
 
-extern "C" __declspec(dllexport) INIT_SIGNATURE(Init){
+INIT_DECLARATION {
 	auto state = new State;  
 	state->window;
-	api->create_window(&state->window, api, 640, 480, "InstaFun");
+	api->create_window(&state->window, api, 1280 * target_width_over_height, 1280, "InstaFun");
 	
     state->sprites = LoadBMPTextureFromFile(api, "data/sprites.bmp");
 	state->background = LoadBMPTextureFromFile(api, "data/stage.bmp");
@@ -33,10 +35,32 @@ extern "C" __declspec(dllexport) INIT_SIGNATURE(Init){
 	return (u8 *) state;
 }
 
-extern "C" __declspec(dllexport) UPDATE_SIGNATURE(Update){
+UPDATE_DECLARATION {
 	auto state = (State *) init_data;
+	if ((state->window.width == 0) || (state->window.height == 0)) {
+		return;
+	}
     
+	glDisable(GL_SCISSOR_TEST);
 	glViewport(0, 0, state->window.width, state->window.height);
+	glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);	
+	
+	f32 current_width_over_height = state->window.width / (f32) state->window.height;
+
+	u32 canvas_width, canvas_height;
+
+	if (current_width_over_height > target_width_over_height) {
+		canvas_height = state->window.height;
+		canvas_width = canvas_height * target_width_over_height;
+	} else {
+		canvas_width = state->window.width;
+		canvas_height = canvas_width / target_width_over_height;
+	}	
+	glEnable(GL_SCISSOR_TEST);
+
+	glViewport((state->window.width - canvas_width) * 0.5f, (state->window.height - canvas_height) * 0.5f, canvas_width, canvas_height);
+	glScissor((state->window.width - canvas_width) * 0.5f, (state->window.height - canvas_height) * 0.5f, canvas_width, canvas_height);
     glClearColor(0, 0.5f, 0.5f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
@@ -45,7 +69,7 @@ extern "C" __declspec(dllexport) UPDATE_SIGNATURE(Update){
     glAlphaFunc(GL_GEQUAL, 1/255.0f);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    
+#if 1
     glBindTexture(GL_TEXTURE_2D, state->background.id);
     
     glBegin(GL_TRIANGLES);
@@ -67,31 +91,13 @@ extern "C" __declspec(dllexport) UPDATE_SIGNATURE(Update){
     glTexCoord2f(1, 1);
     glVertex2f(1.0f, 1.0f);
     glEnd();
-    
-#if 1
-    
-    glBindTexture(GL_TEXTURE_2D, state->sprites.id);
-    
-    glBegin(GL_TRIANGLES);
-    glTexCoord2f(0, 0);
-    glVertex2f(-0.5f, -0.5f);
-    
-    glTexCoord2f(1, 0);
-    glVertex2f(0.5f, -0.5f);
-    
-    glTexCoord2f(1, 1);
-    glVertex2f(0.5f, 0.5f);
-    
-    glTexCoord2f(0, 1);
-    glVertex2f(-0.5f, 0.5f);
-    
-    glTexCoord2f(0, 0);
-    glVertex2f(-0.5f, -0.5f);
-    
-    glTexCoord2f(1, 1);
-    glVertex2f(0.5f, 0.5f);
-    glEnd();
 #endif
+
+    DrawTexturedRect(state->sprites, -128, -100, 0, state->sprites.height - 63, 64, 64);
+
+    DrawTexturedRect(state->sprites, 128, -120, 0, state->sprites.height - 63, 64, 64, DEFAULT_X_ALIGNMENT, DEFAULT_Y_ALIGNMENT, 1.0f);
+
+    DrawTexturedRect(state->sprites, 128, 0, 64, state->sprites.height - 63, 128, 64, 0.3f, DEFAULT_Y_ALIGNMENT, 1.0f);
     
     api->display_window(&state->window);
     

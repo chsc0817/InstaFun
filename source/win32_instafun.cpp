@@ -73,6 +73,14 @@ CREATE_WINDOW_SIGNATURE(Win32CreateWindow) {
     
     SetWindowLongPtrA(window->handle, GWLP_USERDATA, (LONG_PTR)window);
     ShowWindow(window->handle, SW_SHOW);
+
+    RECT rectangle;
+    GetClientRect(window->handle, &rectangle); 
+    
+    s32 real_width = 2 * width - (rectangle.right - rectangle.left);
+    s32 real_height = 2 * height - (rectangle.bottom - rectangle.top);
+
+    SetWindowPos(window->handle, null, 0, 0, real_width, real_height, SWP_NOMOVE | SWP_NOACTIVATE);
 }
 
 DISPLAY_WINDOW_SIGNATURE(Win32DisplayWindow) {
