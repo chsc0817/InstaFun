@@ -1,11 +1,11 @@
-#ifndef WIN32_INSTAFUN_H 
-#define WIN32_INSTAFUN_H
+#pragma once
 
 #include <stdio.h>
 #include <windows.h>
 #include <gl/gl.h>
 
 #include "basic.h"
+#include "input.h"
 
 struct win32_api;
 struct win32_window;
@@ -43,8 +43,7 @@ typedef FREE_FILE_DATA_SIGNATURE((*free_file_data_function));
 #define DISPLAY_WINDOW_SIGNATURE(name) void name(win32_window *window)
 typedef DISPLAY_WINDOW_SIGNATURE((*display_window_function));
 
-struct code_info
-{
+struct code_info {
     init_function   init;
     update_function update;
     u8 *init_data;
@@ -61,6 +60,12 @@ struct win32_api {
     WNDCLASSA window_class;
     HGLRC gl_context;
     code_info application;
+
+    u64 ticks_per_second;
+    u64 time_in_ticks;
+    f32 delta_seconds;
+
+    user_input input;  
 };
 
 struct win32_window {
@@ -71,5 +76,3 @@ struct win32_window {
 
 void Win32Init(win32_api *api);
 bool Win32HandleMessage(win32_api *api);
-
-#endif

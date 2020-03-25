@@ -1,10 +1,10 @@
-#ifndef INSTAFUN_H 
-#define INSTAFUN_H
+#pragma once
 
 #include "basic.h"
+#include "win32_platform.h"
 #include "bmp.cpp"
 #include "render.cpp"
-#include "win32_instafun.h"
+#include "input.cpp"
 
 const f32 target_width_over_height = 16.0f/9.0f;
 
@@ -93,7 +93,33 @@ UPDATE_DECLARATION {
     glEnd();
 #endif
 
+    static f32 countdown;
+    static u32 sprite_pose;
+    const f32 pose_time = 2;
+    const f32 delay_time = 0.5f;
+	
+    if(WasPressed(api->input.keys[' '])) {
+		countdown = pose_time;
+		sprite_pose = 1;
+    } 
+
+    if (countdown > 0) {
+    	countdown -= api->delta_seconds;
+
+    	if (countdown <= pose_time - delay_time) {
+    		sprite_pose = 0;
+    	}
+	    if (countdown <= 0) {
+	    	countdown = 0;
+	    	sprite_pose = 1;
+	    }
+    }     
+
+    if (sprite_pose % 2) {
     DrawTexturedRect(state->sprites, -128, -100, 0, state->sprites.height - 63, 64, 64);
+	} else {
+	DrawTexturedRect(state->sprites, -128, -100, 64, state->sprites.height - 63, 128, 64, 0.3f);	
+	}
 
     DrawTexturedRect(state->sprites, 128, -120, 0, state->sprites.height - 63, 64, 64, DEFAULT_X_ALIGNMENT, DEFAULT_Y_ALIGNMENT, 1.0f);
 
@@ -102,4 +128,3 @@ UPDATE_DECLARATION {
     api->display_window(&state->window);
     
 }
-#endif

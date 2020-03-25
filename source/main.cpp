@@ -1,4 +1,4 @@
-#include "win32_instafun.cpp"
+#include "win32_platform.cpp"
 
 u64 GetLastWriteTime(cstring file) {
     WIN32_FILE_ATTRIBUTE_DATA attributes;
@@ -9,6 +9,8 @@ u64 GetLastWriteTime(cstring file) {
 }
 
 #if defined LIVE_CODE_RELOADING
+
+#include "input.cpp"
 
 bool LoadCode(code_info *code) {
     bool do_reload = false;
@@ -35,8 +37,7 @@ bool LoadCode(code_info *code) {
         
         FreeLibrary(code->dll_handle);
         
-        if (do_reload)
-        {
+        if (do_reload) {
             bool ok = CopyFile("build/instafun.dll", "build/instafun_live.dll", false);
             assert(ok);
         }
@@ -52,8 +53,7 @@ bool LoadCode(code_info *code) {
     return do_reload;
 }
 
-void InitCode(code_info *code)
-{
+void InitCode(code_info *code) {
     bool ok = LoadCode(code);
     assert(ok);
 }
@@ -64,8 +64,7 @@ void InitCode(code_info *code)
 
 #define LoadCode(...) 
 
-void InitCode(code_info *code)
-{
+void InitCode(code_info *code) {
     code->init = Init;
     code->update = Update;
 }

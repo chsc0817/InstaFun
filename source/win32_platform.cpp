@@ -2,7 +2,7 @@
 #include <windows.h>
 #include <gl/gl.h>
 
-#include "win32_instafun.h"
+#include "win32_platform.h"
 
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
@@ -90,20 +90,38 @@ DISPLAY_WINDOW_SIGNATURE(Win32DisplayWindow) {
 bool Win32HandleMessage(win32_api *api){
     MSG msg;
     
+    for (u32 i = 0; i < ArrayCountOf(api->input.keys); i++) {
+        api->input.keys[i].half_transition_count = 0;
+        api->input.keys[i].half_transition_count_overflow = false;
+    }
+
     while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {            
         switch (msg.message) {
             case WM_QUIT: {
                 return false;
             } break;
+
+            case WM_KEYDOWN: {
+                ButtonUpdate(&api->input.keys[msg.wParam], true);
+            } break;
             
+            case WM_KEYUP: {
+                ButtonUpdate(&api->input.keys[msg.wParam], false);
+            } break;            
+
             default:{
                 TranslateMessage(&msg);
                 DispatchMessage(&msg);
             }
         }
     }
-    return true;
-    
+
+    LARGE_INTEGER time;
+    QueryPerformanceCounter(&time);
+    api->delta_seconds = (time.QuadPart - api->time_in_ticks) / (f32) api->ticks_per_second;
+    api->time_in_ticks = time.QuadPart;
+
+    return true;    
 }
 
 READ_ENTIRE_FILE_SIGNATURE(Win32ReadEntireFile) {
@@ -150,4 +168,9 @@ void Win32Init(win32_api *api) {
     if (!RegisterClassA(&api->window_class)) {
         printf("RegisterClassA failed with error %d.\n", GetLastError());
     }        
-}
+
+    LARGE_INTEGER ticks_per_second;
+    QueryPerformanceFrequency(&ticks_per_second);
+    api->ticks_per_second = ticks_per_second.QuadPart;
+
+    }

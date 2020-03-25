@@ -1,5 +1,4 @@
-#ifndef BASIC_H 
-#define BASIC_H
+#pragma once
 
 #include <stdint.h>
 #include <assert.h>
@@ -23,6 +22,8 @@
 #define internal static
 
 #define Swap(a, b) {auto temp = a; a = b; b = temp;} 
+
+#define ArrayCountOf(static_array) (sizeof(static_array) / sizeof((static_array)[0]))   
 
 // is 0 terminated c string
 typedef char * cstring;
@@ -50,6 +51,3 @@ internal u8_array Advance(u8_array *iterator, umm count = 1) {
     
     return skipped_data;
 }
-
-
-#endif

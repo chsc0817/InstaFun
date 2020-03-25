@@ -9,7 +9,7 @@ rem set live_code_reloading=false
 rem nologo: disable visual studio copyright info
 rem Zi: generate debug information
 rem Od: optimize for debugging
-rem Mtd: use multithreaded runtime debug dll (visual studio redistributables)
+rem Mtd: use multithreaded static debug runtime lib (no visual studio redistributables)
 rem EHsc: use minimal exception handling?
 set options=/nologo /Zi /Od /MTd /EHsc
 
