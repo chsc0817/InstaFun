@@ -5,6 +5,7 @@
 #include "bmp.cpp"
 #include "render.cpp"
 #include "input.cpp"
+#include "random.cpp"
 
 const f32 target_width_over_height = 16.0f/9.0f;
 
@@ -26,6 +27,7 @@ struct game_state {
     game_mode mode;
     player players[2];
     f32 showdown_countdown;
+    random_generator rng;
 	texture sprites;
 	texture background;
     texture ready_text;
@@ -45,6 +47,13 @@ texture LoadBMPTextureFromFile(win32_api *api, cstring file_path) {
 INIT_DECLARATION {
 	auto state = new game_state;
     *state = {};
+
+    SYSTEMTIME system_time;
+    GetSystemTime(&system_time);    
+    FILETIME file_time;
+    SystemTimeToFileTime(&system_time, &file_time);
+
+    state->rng = MakeRandomGenerator(file_time.dwLowDateTime + file_time.dwHighDateTime);
 
 	state->window;
 	api->create_window(&state->window, api, 1280 * target_width_over_height, 1280, "InstaFun");
@@ -97,30 +106,10 @@ UPDATE_DECLARATION {
     glAlphaFunc(GL_GEQUAL, 1/255.0f);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_DEPTH_TEST);
 
     DrawTexture(state->background, 0, 0, 0.5f, 0.5f);
 
-    static f32 countdown;
-    static u32 sprite_pose;
-    const f32 pose_time = 0.5f;
-    const f32 delay_time = 0.5f;
-	
-    if(WasPressed(api->input.keys[' '])) {
-		countdown = 1;
-		sprite_pose = 1;
-    } 
-
-    if (countdown > 0) {
-    	countdown -= api->delta_seconds / pose_time;
-
-    	if (countdown <= 1 - delay_time / pose_time) {
-    		sprite_pose = 0;
-    	}
-	    if (countdown <= 0) {
-	    	countdown = 0;
-	    	sprite_pose = 1;
-	    }
-    }   
     u32 player_input[2] = {'A', 'L'};
 
     switch(state->mode) {
@@ -142,7 +131,8 @@ UPDATE_DECLARATION {
 
             if (everyone_ready) {
                 state->mode = GAME_MODE_PLAY;
-                state->showdown_countdown = 2.5f;
+                state->showdown_countdown = RandomF32(&state->rng, 2, 6.1f);
+                printf("%f \n", state->showdown_countdown);
             }
         } break;
         case GAME_MODE_PLAY: {
@@ -172,6 +162,8 @@ UPDATE_DECLARATION {
 
         case GAME_MODE_DONE: {
             for (u32 i = 0; i < ArrayCountOf(state->players); i++) {
+                if (state->players[i].has_won) 
+                    continue;
 
                 f32 center_x = 0;
                 f32 center_y = -110;
@@ -179,11 +171,21 @@ UPDATE_DECLARATION {
                 f32 x = Lerp(state->players[i].x, center_x, 0.8f);
                 f32 y = Lerp(state->players[i].y, center_y, 0.8f);
 
-                if (state->players[i].has_won) {
-                    DrawTexturedRect(state->sprites, x, y, 64, state->sprites.height - 63, 128, 64, 0.3f, DEFAULT_Y_ALIGNMENT, state->players[i].x_flip, DEFAULT_FLIP, 1 - countdown);     
-                } else {
-                    DrawTexturedRect(state->sprites, x, y, 0, state->sprites.height - 123, 64, 64, DEFAULT_X_ALIGNMENT, DEFAULT_Y_ALIGNMENT, state->players[i].x_flip, DEFAULT_FLIP, 1 - countdown);     
-                }  
+                DrawTexturedRect(state->sprites, x, y, 0, state->sprites.height - 123, 64, 64, DEFAULT_X_ALIGNMENT, DEFAULT_Y_ALIGNMENT, state->players[i].x_flip, DEFAULT_FLIP);     
+            }
+
+            for (u32 i = 0; i < ArrayCountOf(state->players); i++) {
+                if (!state->players[i].has_won) 
+                    continue;
+
+                f32 center_x = 0;
+                f32 center_y = -110;
+
+                f32 x = Lerp(state->players[i].x, center_x, 0.8f);
+                f32 y = Lerp(state->players[i].y, center_y, 0.8f);
+
+                DrawTexturedRect(state->sprites, x, y, 64, state->sprites.height - 63, 128, 64, 0.3f, DEFAULT_Y_ALIGNMENT, state->players[i].x_flip, DEFAULT_FLIP);     
+                            
             }
 
             if (WasPressed(api->input.keys[' '])) {
@@ -192,14 +194,13 @@ UPDATE_DECLARATION {
                     state->players[i].is_ready = false;
                     state->players[i].has_won = false;
                 }
-
             }
 
         } break;
     }
     if (state->mode != GAME_MODE_DONE) {
         for (u32 i = 0; i < ArrayCountOf(state->players); i++) {
-            DrawTexturedRect(state->sprites, state->players[i].x, state->players[i].y, 0, state->sprites.height - 63, 64, 64, DEFAULT_X_ALIGNMENT, DEFAULT_Y_ALIGNMENT, state->players[i].x_flip, DEFAULT_FLIP, 1 - countdown);     
+            DrawTexturedRect(state->sprites, state->players[i].x, state->players[i].y, 0, state->sprites.height - 63, 64, 64, DEFAULT_X_ALIGNMENT, DEFAULT_Y_ALIGNMENT, state->players[i].x_flip, DEFAULT_FLIP);     
         }
     }
 	

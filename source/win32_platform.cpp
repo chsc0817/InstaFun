@@ -133,6 +133,7 @@ READ_ENTIRE_FILE_SIGNATURE(Win32ReadEntireFile) {
     if (!GetFileAttributesEx(file_path, GetFileExInfoStandard, &attribute_data))
         return {};
     
+    assert(attribute_data.nFileSizeHigh == 0);
     u64 byte_count = (((u64)attribute_data.nFileSizeHigh) << 32) | attribute_data.nFileSizeLow;
     
     u8_array data;
@@ -140,9 +141,12 @@ READ_ENTIRE_FILE_SIGNATURE(Win32ReadEntireFile) {
     data.base = new u8[data.count];
     
     DWORD bytes_read_count;
-    if (!ReadFile(file_handle, data.base, data.count, &bytes_read_count, null))
+    if (!ReadFile(file_handle, data.base, data.count, &bytes_read_count, null)) {
+        CloseHandle(file_handle);
         return {};
-    
+    }
+
+    CloseHandle(file_handle);    
     return { data, true };
 }
 
