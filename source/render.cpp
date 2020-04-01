@@ -24,7 +24,7 @@ texture MakeTexture (s32 width, s32 height, u8_array pixels) {
 	return result;
 }
 
-void DrawTexturedRect(texture my_texture, f32 x, f32 y, f32 tx, f32 ty, f32 width, f32 height, f32 x_alignment, f32 y_alignment, f32 x_flip, f32 y_flip) {
+void DrawTexturedRect(texture my_texture, f32 x, f32 y, f32 tx, f32 ty, f32 width, f32 height, f32 x_alignment, f32 y_alignment, f32 x_flip, f32 y_flip, f32 alpha) {
 	glBindTexture(GL_TEXTURE_2D, my_texture.id);
 	f32 texel_width = 1.0f / my_texture.width; 
     f32 texel_height = 1.0f / my_texture.height;
@@ -48,6 +48,7 @@ void DrawTexturedRect(texture my_texture, f32 x, f32 y, f32 tx, f32 ty, f32 widt
 
     glBegin(GL_TRIANGLES);
     glTexCoord2f(tx0, ty0);
+    glColor4f(1, 1, 1, alpha);
     glVertex2f(x * canvas_texel_width, y * canvas_texel_height);
     
     glTexCoord2f(tx1, ty0);
@@ -65,4 +66,8 @@ void DrawTexturedRect(texture my_texture, f32 x, f32 y, f32 tx, f32 ty, f32 widt
     glTexCoord2f(tx1, ty1);
     glVertex2f((x + width) * canvas_texel_width, (y + height) * canvas_texel_height);
     glEnd();
+}
+
+void DrawTexture(texture my_texture, f32 x, f32 y, f32 x_alignment, f32 y_alignment, f32 x_flip, f32 y_flip, f32 alpha) {
+	DrawTexturedRect(my_texture, x, y, 0, 0, my_texture.width, my_texture.height, x_alignment, y_alignment, x_flip, y_flip, alpha);
 }

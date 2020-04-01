@@ -8,14 +8,32 @@
 
 const f32 target_width_over_height = 16.0f/9.0f;
 
-struct State {
-	win32_window window;
-	texture sprites;
-	texture background;
+enum game_mode {
+    GAME_MODE_MENU, 
+    GAME_MODE_PLAY,
+    GAME_MODE_DONE
 };
 
-texture LoadBMPTextureFromFile(win32_api *api, cstring file_path)
-{
+struct player {
+    f32 x,y;
+    f32 x_flip;
+    bool is_ready;
+    bool has_won;
+};
+
+struct game_state {
+	win32_window window;
+    game_mode mode;
+    player players[2];
+    f32 showdown_countdown;
+	texture sprites;
+	texture background;
+    texture ready_text;
+    texture ok_text;
+    texture go_text;
+};
+
+texture LoadBMPTextureFromFile(win32_api *api, cstring file_path) {
     auto result = api->read_entire_file(file_path);
     assert(result.ok);
     texture my_texture = LoadBMPTexture(result.data);
@@ -25,18 +43,28 @@ texture LoadBMPTextureFromFile(win32_api *api, cstring file_path)
 }
 
 INIT_DECLARATION {
-	auto state = new State;  
+	auto state = new game_state;
+    *state = {};
+
 	state->window;
 	api->create_window(&state->window, api, 1280 * target_width_over_height, 1280, "InstaFun");
+
+    state->mode = GAME_MODE_MENU;
+
+    state->players[0] = {-128, -100, 0};
+    state->players[1] = { 128, -120, 1};
 	
     state->sprites = LoadBMPTextureFromFile(api, "data/sprites.bmp");
 	state->background = LoadBMPTextureFromFile(api, "data/stage.bmp");
-    
+    state->ready_text = LoadBMPTextureFromFile(api, "data/ready.bmp");
+    state->ok_text = LoadBMPTextureFromFile(api, "data/ok.bmp");
+    state->go_text = LoadBMPTextureFromFile(api, "data/go.bmp");
+
 	return (u8 *) state;
 }
 
 UPDATE_DECLARATION {
-	auto state = (State *) init_data;
+	auto state = (game_state *) init_data;
 	if ((state->window.width == 0) || (state->window.height == 0)) {
 		return;
 	}
@@ -69,62 +97,112 @@ UPDATE_DECLARATION {
     glAlphaFunc(GL_GEQUAL, 1/255.0f);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-#if 1
-    glBindTexture(GL_TEXTURE_2D, state->background.id);
-    
-    glBegin(GL_TRIANGLES);
-    glTexCoord2f(0, 0);
-    glVertex2f(-1.0f, -1.0f);
-    
-    glTexCoord2f(1, 0);
-    glVertex2f(1.0f, -1.0f);
-    
-    glTexCoord2f(1, 1);
-    glVertex2f(1.0f, 1.0f);
-    
-    glTexCoord2f(0, 1);
-    glVertex2f(-1.0f, 1.0f);
-    
-    glTexCoord2f(0, 0);
-    glVertex2f(-1.0f, -1.0f);
-    
-    glTexCoord2f(1, 1);
-    glVertex2f(1.0f, 1.0f);
-    glEnd();
-#endif
+
+    DrawTexture(state->background, 0, 0, 0.5f, 0.5f);
 
     static f32 countdown;
     static u32 sprite_pose;
-    const f32 pose_time = 2;
+    const f32 pose_time = 0.5f;
     const f32 delay_time = 0.5f;
 	
     if(WasPressed(api->input.keys[' '])) {
-		countdown = pose_time;
+		countdown = 1;
 		sprite_pose = 1;
     } 
 
     if (countdown > 0) {
-    	countdown -= api->delta_seconds;
+    	countdown -= api->delta_seconds / pose_time;
 
-    	if (countdown <= pose_time - delay_time) {
+    	if (countdown <= 1 - delay_time / pose_time) {
     		sprite_pose = 0;
     	}
 	    if (countdown <= 0) {
 	    	countdown = 0;
 	    	sprite_pose = 1;
 	    }
-    }     
+    }   
+    u32 player_input[2] = {'A', 'L'};
 
-    if (sprite_pose % 2) {
-    DrawTexturedRect(state->sprites, -128, -100, 0, state->sprites.height - 63, 64, 64);
-	} else {
-	DrawTexturedRect(state->sprites, -128, -100, 64, state->sprites.height - 63, 128, 64, 0.3f);	
-	}
+    switch(state->mode) {
+        case GAME_MODE_MENU: {
+            DrawTexture(state->ready_text, 0, 70);
 
-    DrawTexturedRect(state->sprites, 128, -120, 0, state->sprites.height - 63, 64, 64, DEFAULT_X_ALIGNMENT, DEFAULT_Y_ALIGNMENT, 1.0f);
+            bool everyone_ready = true;
 
-    DrawTexturedRect(state->sprites, 128, 0, 64, state->sprites.height - 63, 128, 64, 0.3f, DEFAULT_Y_ALIGNMENT, 1.0f);
-    
-    api->display_window(&state->window);
+            for (u32 i = 0; i < ArrayCountOf(state->players); i++) {
+                if (WasPressed(api->input.keys[player_input[i]])) {
+                    state->players[i].is_ready = true;
+                }
+                if (!state->players[i].is_ready) {
+                    everyone_ready = false;
+                } else {
+                    DrawTexture(state->ok_text, state->players[i].x, state->players[i].y + 60);
+                }
+            }
+
+            if (everyone_ready) {
+                state->mode = GAME_MODE_PLAY;
+                state->showdown_countdown = 2.5f;
+            }
+        } break;
+        case GAME_MODE_PLAY: {
+            state->showdown_countdown -= api->delta_seconds;
+
+            if(state->showdown_countdown <= 0 ) {
+                DrawTexture(state->go_text, 0, 10);
+            }
+
+            bool invert_win = (state->showdown_countdown > 0);
+            bool is_done = false;
+
+            for (u32 i = 0; i < ArrayCountOf(state->players); i++) {
+
+                if (WasPressed(api->input.keys[player_input[i]])) {
+                    state->players[i].has_won = true;
+                    is_done = true;
+                }
+            }
+            if (is_done) {
+                for (u32 i = 0; i < ArrayCountOf(state->players); i++) {
+                    state->players[i].has_won ^= invert_win;
+                }
+                state->mode = GAME_MODE_DONE;
+            }
+        } break;
+
+        case GAME_MODE_DONE: {
+            for (u32 i = 0; i < ArrayCountOf(state->players); i++) {
+
+                f32 center_x = 0;
+                f32 center_y = -110;
+
+                f32 x = Lerp(state->players[i].x, center_x, 0.8f);
+                f32 y = Lerp(state->players[i].y, center_y, 0.8f);
+
+                if (state->players[i].has_won) {
+                    DrawTexturedRect(state->sprites, x, y, 64, state->sprites.height - 63, 128, 64, 0.3f, DEFAULT_Y_ALIGNMENT, state->players[i].x_flip, DEFAULT_FLIP, 1 - countdown);     
+                } else {
+                    DrawTexturedRect(state->sprites, x, y, 0, state->sprites.height - 123, 64, 64, DEFAULT_X_ALIGNMENT, DEFAULT_Y_ALIGNMENT, state->players[i].x_flip, DEFAULT_FLIP, 1 - countdown);     
+                }  
+            }
+
+            if (WasPressed(api->input.keys[' '])) {
+                state->mode = GAME_MODE_MENU;
+                for (u32 i = 0; i < ArrayCountOf(state->players); i++) {
+                    state->players[i].is_ready = false;
+                    state->players[i].has_won = false;
+                }
+
+            }
+
+        } break;
+    }
+    if (state->mode != GAME_MODE_DONE) {
+        for (u32 i = 0; i < ArrayCountOf(state->players); i++) {
+            DrawTexturedRect(state->sprites, state->players[i].x, state->players[i].y, 0, state->sprites.height - 63, 64, 64, DEFAULT_X_ALIGNMENT, DEFAULT_Y_ALIGNMENT, state->players[i].x_flip, DEFAULT_FLIP, 1 - countdown);     
+        }
+    }
+	
+    api->display_window(&state->window);    
     
 }
