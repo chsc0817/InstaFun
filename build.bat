@@ -11,7 +11,7 @@ rem Zi: generate debug information
 rem Od: optimize for debugging
 rem Mtd: use multithreaded static debug runtime lib (no visual studio redistributables)
 rem EHsc: use minimal exception handling?
-set options=/nologo /Zi /Od /MTd /EHsc
+set options=/nologo /Zi /Od /MTd /EHsc /I "%cd%\3rd_party"
 
 set t=%time:~0,8%
 set t=%t::=-%

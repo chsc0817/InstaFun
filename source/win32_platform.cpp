@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <windows.h>
 #include <gl/gl.h>
+#include <gl/glext.h>
+#include <gl/wglext.h>
 
 #include "win32_platform.h"
 
@@ -8,6 +10,87 @@
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "kernel32.lib")
 #pragma comment(lib, "opengl32.lib")
+
+typedef BOOL (*wglChoosePixelFormatARB_function) (HDC hdc,
+                                 const int *piAttribIList,
+                                 const FLOAT *pfAttribFList,
+                                 UINT nMaxFormats,
+                                 int *piFormats,
+                                 UINT *nNumFormats);
+
+typedef HGLRC (*wglCreateContextAttribsARB_function) (HDC hDC, HGLRC hShareContext,
+                                     const int *attribList);
+
+wglChoosePixelFormatARB_function wglChoosePixelFormatARB;
+wglCreateContextAttribsARB_function wglCreateContextAttribsARB;
+
+#define WglLoad(name) name = (name ##_function) wglGetProcAddress(#name)
+
+void Win32RequestOpenGLCoreProfile(win32_api *api, win32_window *window, cstring title){
+    WglLoad(wglChoosePixelFormatARB);
+    WglLoad(wglCreateContextAttribsARB);
+
+    if (wglChoosePixelFormatARB && wglCreateContextAttribsARB) {
+        wglMakeCurrent(null, null);
+        wglDeleteContext(api->gl_context);
+        DestroyWindow(window->handle);
+
+        window->handle = CreateWindowA(
+            api->window_class.lpszClassName,
+            title,
+            WS_OVERLAPPEDWINDOW,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            window->width,
+            window->height,
+            null,
+            null,
+            api->window_class.hInstance,
+            0
+            );
+        assert(window->handle);
+
+        window->device_context = GetDC(window->handle);
+        assert(window->device_context);
+
+        s32 pixel_format_attributes[] = {
+            WGL_DRAW_TO_WINDOW_ARB, GL_TRUE,
+            WGL_SUPPORT_OPENGL_ARB, GL_TRUE,
+            WGL_DOUBLE_BUFFER_ARB,  GL_TRUE,
+            WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB,
+            WGL_COLOR_BITS_ARB, 32,
+            WGL_DEPTH_BITS_ARB, 24,
+            WGL_STENCIL_BITS_ARB, 8,
+            0,
+            // multi sample anti aliasing
+            WGL_SAMPLE_BUFFERS_ARB, GL_TRUE, //Number of buffers (must be 1 at time of writing)
+            WGL_SAMPLES_ARB, 1,        //Number of samples
+            0 // end
+        };
+
+        s32 pixel_format;
+        u32 pixel_format_count;
+        wglChoosePixelFormatARB(window->device_context, pixel_format_attributes, null, 1, &pixel_format, &pixel_format_count);
+        SetPixelFormat(window->device_context, pixel_format, null);
+
+        s32 context_attributes[] = {
+            WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+            WGL_CONTEXT_MINOR_VERSION_ARB, 3,
+ #if 0
+            WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+ #else
+            WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+#endif
+            WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB,
+            0
+        };
+
+        api->gl_context = wglCreateContextAttribsARB(window->device_context, null, context_attributes);
+        assert(api->gl_context);
+
+        wglMakeCurrent(window->device_context, api->gl_context);
+    }    
+}
 
 LRESULT CALLBACK WindowProc(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param) {
     auto window = (win32_window *) GetWindowLongPtrA(window_handle, GWLP_USERDATA); 
@@ -48,12 +131,14 @@ CREATE_WINDOW_SIGNATURE(Win32CreateWindow) {
         api->window_class.hInstance,
         0
         );
+    assert(window->handle);
     
     window->width = width;
     window->height = height;
     
     window->device_context = GetDC(window->handle);
-    
+    assert(window->device_context);
+
     PIXELFORMATDESCRIPTOR pixel_format_descriptor = {};
     pixel_format_descriptor.nSize = sizeof(pixel_format_descriptor);
     pixel_format_descriptor.nVersion = 1;
@@ -68,9 +153,12 @@ CREATE_WINDOW_SIGNATURE(Win32CreateWindow) {
     s32 pixel_format = ChoosePixelFormat(window->device_context, &pixel_format_descriptor);
     SetPixelFormat(window->device_context, pixel_format, &pixel_format_descriptor);
     api->gl_context = wglCreateContext(window->device_context);
+    assert(api->gl_context);
     
     wglMakeCurrent(window->device_context, api->gl_context);
     
+    Win32RequestOpenGLCoreProfile(api, window, title);
+
     SetWindowLongPtrA(window->handle, GWLP_USERDATA, (LONG_PTR)window);
     ShowWindow(window->handle, SW_SHOW);
 
