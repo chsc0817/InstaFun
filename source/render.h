@@ -38,6 +38,8 @@ struct render_context {
 	render_command commands[256];
 	u32 vertex_count;
 	u32 command_count;
+	u32 program;
+	s32 diffuse_texture_uniform;
 };
 
 texture MakeTexture (s32 width, s32 height, u8_array pixels);

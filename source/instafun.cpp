@@ -107,10 +107,12 @@ UPDATE_DECLARATION {
     glClearColor(0, 0.5f, 0.5f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    glEnable(GL_TEXTURE_2D);
+#if 0
+	glEnable(GL_TEXTURE_2D);
     glEnable(GL_ALPHA_TEST);
     glAlphaFunc(GL_GEQUAL, 1/255.0f);
-    glEnable(GL_BLEND);
+#endif
+	glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_DEPTH_TEST);
 

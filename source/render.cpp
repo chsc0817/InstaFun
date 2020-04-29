@@ -29,6 +29,21 @@ typedef void (*glBindVertexArray_function)(GLuint array);
 typedef void (*glDeleteVertexArrays_function) (GLsizei n, const GLuint *arrays);
 //typedef void (*glDrawArrays_function) (GLenum mode, GLint first,	GLsizei count);
 typedef void (*glDebugMessageCallback_function)(DEBUGPROC callback, void * userParam);
+typedef GLuint (*glCreateProgram_function)();
+typedef void (*glAttachShader_function)(GLuint program,	GLuint shader);
+typedef GLuint (*glCreateShader_function)(GLenum shaderType);
+typedef void (*glDeleteProgram_function)(GLuint program);
+typedef void (*glLinkProgram_function)(GLuint program);
+typedef void (*glDeleteShader_function)(GLuint shader);
+typedef void (*glUseProgram_function)(GLuint program);
+typedef void (*glBindAttribLocation_function)(GLuint program, GLuint index, const GLchar *name);
+typedef void (*glUniform1i_function)(GLint location, GLint v0);
+typedef void (*glShaderSource_function)(GLuint shader, GLsizei count, const GLchar **string, const GLint *length);
+typedef void (*glCompileShader_function)(GLuint shader);
+typedef void (*glGetShaderiv_function)(GLuint shader, GLenum pname, GLint *params);
+typedef void (*glGetProgramiv_function)(GLuint program, GLenum pname, GLint *params);
+typedef GLint (*glGetUniformLocation_function)(GLuint program, const GLchar *name);
+typedef void (*glActiveTexture_function)(GLenum texture);
 
 #define GlLoad(name) name = (name ##_function) wglGetProcAddress(#name); assert(name)
 
@@ -46,9 +61,62 @@ glBindVertexArray_function glBindVertexArray;
 glDeleteVertexArrays_function glDeleteVertexArrays;
 //glDrawArrays_function glDrawArrays;
 glDebugMessageCallback_function glDebugMessageCallback;
+glCreateProgram_function glCreateProgram;
+glAttachShader_function glAttachShader;
+glCreateShader_function glCreateShader;
+glDeleteProgram_function glDeleteProgram;
+glLinkProgram_function glLinkProgram;
+glDeleteShader_function glDeleteShader;
+glUseProgram_function glUseProgram;
+glBindAttribLocation_function glBindAttribLocation;
+glUniform1i_function glUniform1i;
+glShaderSource_function glShaderSource;
+glCompileShader_function glCompileShader;
+glGetShaderiv_function glGetShaderiv;
+glGetProgramiv_function glGetProgramiv;
+glGetUniformLocation_function glGetUniformLocation;
+glActiveTexture_function glActiveTexture;
+
+enum {
+	Vertex_Position,
+	Vertex_Texture_Coordinate,
+	Vertex_Color
+};
+
 
 GL_DEBUG_CALLBACK(GlHandleDebugMessage) {
 	assert(0);
+}
+
+u32 MakeShaderObject(u32 shader_type, cstring source_code) {
+	u32 shader = glCreateShader(shader_type);
+	glShaderSource(shader, 1, (const GLchar **)&source_code, null);
+	glCompileShader(shader);
+
+	s32 is_compiled;
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &is_compiled);
+	assert(is_compiled);
+
+	return shader;
+}
+
+u32 MakeProgramObject(u32 vertex_shader_object, u32 fragment_shader_object) {
+	u32 program = glCreateProgram();
+	glAttachShader(program, vertex_shader_object);
+	glAttachShader(program, fragment_shader_object);
+
+	glBindAttribLocation(program, Vertex_Position, "vertex_position");
+	glBindAttribLocation(program, Vertex_Texture_Coordinate, "vertex_texture_coordinate");
+	glBindAttribLocation(program, Vertex_Color, "vertex_color");
+
+	glLinkProgram(program);
+
+	s32 is_linked;
+	glGetProgramiv(program, GL_LINK_STATUS, &is_linked);
+	assert(is_linked);
+
+
+	return program;
 }
 
 render_context MakeRenderContext() {
@@ -66,12 +134,67 @@ render_context MakeRenderContext() {
 	GlLoad(glDeleteVertexArrays);
 //	GlLoad(glDrawArrays);
 	GlLoad(glDebugMessageCallback);
+	GlLoad(glCreateProgram);
+	GlLoad(glAttachShader);
+	GlLoad(glCreateShader);
+	GlLoad(glDeleteProgram);
+	GlLoad(glLinkProgram);
+	GlLoad(glDeleteShader);
+	GlLoad(glUseProgram);
+	GlLoad(glBindAttribLocation);
+	GlLoad(glUniform1i);
+	GlLoad(glShaderSource);
+	GlLoad(glCompileShader);
+	GlLoad(glGetShaderiv);
+	GlLoad(glGetProgramiv);
+	GlLoad(glGetUniformLocation);
+	GlLoad(glActiveTexture);
 
 	glEnable(GL_DEBUG_OUTPUT);
 	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 	glDebugMessageCallback(GlHandleDebugMessage, null);
 
-	return {};
+	char vertex_source[] = 
+R"(
+#version 330
+in vec3 vertex_position;
+in vec2 vertex_texture_coordinate;
+in vec4 vertex_color;
+
+out vec2 fragment_texture_coordinate;
+out vec4 fragment_color;
+
+void main() {
+	fragment_texture_coordinate = vertex_texture_coordinate;
+	fragment_color = vertex_color;
+	gl_Position = vec4(vertex_position, 1);
+}
+)";
+	
+	char fragment_source[] = 
+R"(
+#version 330
+in vec2 fragment_texture_coordinate;
+in vec4 fragment_color;
+
+uniform sampler2D diffuse_texture;
+
+out vec4 pixel_color;
+
+void main() {
+	vec4 diffuse_color = texture(diffuse_texture, fragment_texture_coordinate);
+	pixel_color = fragment_color * diffuse_color;
+}
+)";
+	
+	u32 vertex_shader = MakeShaderObject(GL_VERTEX_SHADER, vertex_source);
+	u32 fragment_shader = MakeShaderObject(GL_FRAGMENT_SHADER, fragment_source);
+	render_context context = {};
+	context.program = MakeProgramObject(vertex_shader, fragment_shader);
+
+	context.diffuse_texture_uniform = glGetUniformLocation(context.program, "diffuse_texture");
+
+	return context;
 }
 
 f32 Lerp(f32 a, f32 b, f32 blend_factor) {
@@ -191,17 +314,22 @@ void DrawTexture(render_context *renderer, texture my_texture, f32 x, f32 y, f32
 
 void Render(render_context *renderer) {
 	u32 vertex_buffer, vertex_array;
+
+	glGenVertexArrays(1, &vertex_array);
+	glBindVertexArray(vertex_array);
+
 	glGenBuffers(1, &vertex_buffer);
 	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
 	glBufferData(GL_ARRAY_BUFFER, renderer->vertex_count * sizeof(render_vertex), renderer->vertices, GL_STREAM_DRAW);
-#if 0
-	glEnableVertexAttribArray(vertex_attribute_index);
-	glEnableVertexAttribArray(texture_attribute_index);
-	glEnableVertexAttribArray(color_attribute_index);
 
-	glVertexAttribPointer(vertex_attribute_index, 3, GL_FLOAT, GL_FALSE,sizeof(render_vertex), (void *) 0);
-	glVertexAttribPointer(texture_attribute_index, 2, GL_FLOAT, GL_FALSE, sizeof(render_vertex), (void *) (3 * sizeof(f32)));
-	glVertexAttribPointer(color_attribute_index, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(render_vertex), (void *) (5 * sizeof(f32)));
+#if 1
+	glEnableVertexAttribArray(Vertex_Position);
+	glEnableVertexAttribArray(Vertex_Texture_Coordinate);
+	glEnableVertexAttribArray(Vertex_Color);
+
+	glVertexAttribPointer(Vertex_Position, 3, GL_FLOAT, GL_FALSE,sizeof(render_vertex), (void *) 0);
+	glVertexAttribPointer(Vertex_Texture_Coordinate, 2, GL_FLOAT, GL_FALSE, sizeof(render_vertex), (void *) (3 * sizeof(f32)));
+	glVertexAttribPointer(Vertex_Color, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(render_vertex), (void *) (5 * sizeof(f32)));
 #else
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -211,6 +339,10 @@ void Render(render_context *renderer) {
 	glTexCoordPointer(2, GL_FLOAT, sizeof(render_vertex), (void *) (3 * sizeof(f32)));
 	glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(render_vertex), (void *) (5 * sizeof(f32)));
 #endif
+
+	glUseProgram(renderer->program);
+	glUniform1i(renderer->diffuse_texture_uniform, 0);
+	glActiveTexture(GL_TEXTURE0 + 0);
 
 	for (u32 i = 0; i < renderer->command_count; ++i) {
 		glBindTexture(GL_TEXTURE_2D, renderer->commands[i].texture_id);
